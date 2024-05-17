@@ -28,104 +28,114 @@ class CanvasManager {
     this.image.onload = () => {
       this.clearCanvas();
       this.setBackground(this.bgColor);
-      this.applyMask();
-      this.drawText(this.template.caption.text, this.template.cta.text);
 
-      // Calculate the width and height of the image
-      const canvasHeight = this.canvas.height;
-      const imageHeight = (3 / 4) * canvasHeight;
-      const imageWidth = (3 / 4) * canvasHeight;
+      const padding = 15;
+      const availableWidth = this.canvas.width - 2 * padding;
+      const availableHeight =
+        this.canvas.height -
+        2 * padding -
+        this.template.caption.height -
+        this.template.cta.height -
+        30; // 30 for spacing between elements
+      const imageAspectRatio = this.image.width / this.image.height;
+      const canvasAspectRatio = availableWidth / availableHeight;
 
-      // Calculate the coordinates to center the image
+      let imageWidth, imageHeight;
+
+      if (imageAspectRatio > canvasAspectRatio) {
+        imageWidth = availableWidth;
+        imageHeight = imageWidth / imageAspectRatio;
+      } else {
+        imageHeight = availableHeight;
+        imageWidth = imageHeight * imageAspectRatio;
+      }
+
       const centerX = (this.canvas.width - imageWidth) / 2;
-      const centerY = (this.canvas.height - imageHeight) / 2;
+      const centerY = padding;
 
-      // Draw the image at the calculated coordinates with fixed dimensions
       this.ctx.drawImage(this.image, centerX, centerY, imageWidth, imageHeight);
+
+      this.setText(
+        this.template.caption.text,
+        this.template.cta.text,
+        centerY + imageHeight + 15
+      ); // Adjusting the position of text below the image
     };
   }
 
-  applyMask() {
-    const mask = new Image();
-    mask.crossOrigin = "anonymous";
-    mask.src = `${this.template.urls.mask}?random=${Math.random()}`;
-    mask.onload = () => {
-      this.ctx.drawImage(mask, 0, 0, this.canvas.width, this.canvas.height);
-      this.ctx.globalCompositeOperation = "source-in";
-      this.ctx.drawImage(
-        this.image,
-        this.template.image_mask.x,
-        this.template.image_mask.y,
-        this.template.image_mask.width,
-        900 // Set height to 900 as per your requirement
-      );
-      this.ctx.globalCompositeOperation = "source-over";
-      this.drawMaskStroke();
-    };
+  updateText(caption, callToAction) {
+    if (this.image) {
+      this.drawImage(this.image);
+    } else {
+      this.clearCanvas();
+      this.setBackground(this.bgColor);
+      this.setText(caption, callToAction, 60); // Ensure text is set at the start
+    }
   }
 
-  drawMaskStroke() {
-    const maskStroke = new Image();
-    maskStroke.crossOrigin = "anonymous";
-    maskStroke.src = `${this.template.urls.stroke}?random=${Math.random()}`;
-    maskStroke.onload = () => {
-      this.ctx.drawImage(
-        maskStroke,
-        0,
-        0,
-        this.canvas.width,
-        this.canvas.height
-      );
-    };
-  }
-
-  setText(caption, callToAction) {
+  setText(caption, callToAction, textStartY) {
+    // Set caption styles
     this.ctx.font = `${this.template.caption.font_size}px Arial`;
     this.ctx.fillStyle = this.template.caption.text_color;
-    this.drawText(
-      caption,
-      this.template.caption.position.x,
-      this.template.caption.position.y,
-      this.template.caption.max_characters_per_line
-    );
+    this.ctx.textAlign = "center";
+    this.ctx.textBaseline = "middle";
 
-    this.ctx.font = "30px Arial";
+    // Calculate caption position
+    const captionX = this.canvas.width / 2;
+    const captionY = textStartY;
+
+    // Draw caption
+    this.drawText(caption, captionX, captionY, this.template.caption.max_width);
+
+    // Set call-to-action styles
+    this.ctx.font = `${this.template.cta.font_size}px Arial`;
     this.ctx.fillStyle = this.template.cta.text_color;
     this.ctx.textAlign = "center";
+    this.ctx.textBaseline = "middle";
+
+    // Draw call-to-action background
+    const ctaX = this.canvas.width / 2;
+    const ctaY = captionY + this.template.caption.font_size + 20; // 20 for spacing between caption and CTA
+    const ctaWidth = this.template.cta.width;
+    const ctaHeight = this.template.cta.height;
+
     this.ctx.fillStyle = this.template.cta.background_color;
     this.ctx.fillRect(
-      this.template.cta.position.x - 100,
-      this.template.cta.position.y - 20,
-      200,
-      50
+      ctaX - ctaWidth / 2,
+      ctaY - ctaHeight / 2,
+      ctaWidth,
+      ctaHeight
     );
+
+    // Draw call-to-action text
     this.ctx.fillStyle = this.template.cta.text_color;
-    this.ctx.fillText(
-      callToAction,
-      this.template.cta.position.x,
-      this.template.cta.position.y + 10
-    );
+    this.ctx.fillText(callToAction, ctaX, ctaY);
   }
 
-  drawText(text, x, y, maxCharsPerLine) {
+  drawText(text, x, y, maxWidth) {
     const words = text.split(" ");
     let line = "";
-    let yPos = y;
+    const lineHeight = this.template.caption.font_size * 1.2;
+    const lines = [];
     for (let n = 0; n < words.length; n++) {
-      let testLine = line + words[n] + " ";
-      let metrics = this.ctx.measureText(testLine);
-      let testWidth = metrics.width;
-      if (testWidth > maxCharsPerLine && n > 0) {
-        this.ctx.fillText(line, x, yPos);
+      const testLine = line + words[n] + " ";
+      const metrics = this.ctx.measureText(testLine);
+      const testWidth = metrics.width;
+      if (testWidth > maxWidth && n > 0) {
+        lines.push(line);
         line = words[n] + " ";
-        yPos += this.template.caption.font_size;
       } else {
         line = testLine;
       }
     }
-    this.ctx.fillText(line, x, yPos);
+    lines.push(line);
+
+    for (let i = 0; i < lines.length; i++) {
+      this.ctx.fillText(lines[i], x, y + i * lineHeight);
+    }
   }
 }
+
 const CanvasEditor = () => {
   const canvasRef = useRef(null);
   const [canvasManager, setCanvasManager] = useState(null);
@@ -138,16 +148,22 @@ const CanvasEditor = () => {
   const template = {
     caption: {
       text: "1 & 2 BHK Luxury Apartments at just Rs.34.97 Lakhs",
-      position: { x: 50, y: 50 },
-      max_characters_per_line: 31,
       font_size: 44,
       text_color: "#FFFFFF",
+      background_color: "#8F9785",
+      max_width: 960,
+      height: 60,
+      offset_bottom: 100,
     },
     cta: {
       text: "Shop Now",
-      position: { x: 190, y: 320 },
+      font_size: 44,
       text_color: "#FFFFFF",
-      background_color: "#000000",
+      background_color: "#8F9785",
+      width: 250,
+      height: 60,
+      max_width: 960,
+      offset_bottom: 40,
     },
     image_mask: {
       x: 56,
@@ -174,21 +190,20 @@ const CanvasEditor = () => {
   useEffect(() => {
     if (canvasManager) {
       canvasManager.setBackground(bgColor);
-      if (image) {
-        canvasManager.drawImage(image);
-      } else {
-        canvasManager.setText(caption, callToAction);
-      }
+      canvasManager.updateText(caption, callToAction);
     }
-  }, [bgColor, caption, callToAction, image, canvasManager]);
+  }, [bgColor, caption, callToAction, canvasManager]);
+
+  useEffect(() => {
+    if (canvasManager && image) {
+      canvasManager.drawImage(image);
+    }
+  }, [image, canvasManager]);
 
   const handleImageChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       const imgFile = e.target.files[0];
       setImage(imgFile);
-      if (canvasManager) {
-        canvasManager.drawImage(imgFile);
-      }
     }
   };
 
@@ -199,7 +214,7 @@ const CanvasEditor = () => {
           ref={canvasRef}
           width={1080}
           height={1080}
-          style={{ width: 400, height: 400 }}
+          style={{ width: 500, height: 500 }}
           className="flex justify-center items-center border"
         ></canvas>
       </div>
