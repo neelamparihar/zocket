@@ -95,7 +95,8 @@ class CanvasManager {
 
     // Draw call-to-action background
     const ctaX = this.canvas.width / 2;
-    const ctaY = captionY + this.template.caption.font_size + 20; // 20 for spacing between caption and CTA
+    const captionMargin = 30; // Margin between caption and CTA
+    const ctaY = captionY + this.template.caption.font_size + captionMargin; // Added margin for spacing
     const ctaWidth = this.template.cta.width;
     const ctaHeight = this.template.cta.height;
 
